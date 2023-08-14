@@ -26,8 +26,8 @@ public class PhishingController {
         } else if (service.checkPredictedUrl(url)) {
             return new ResponseEntity<>(mapper.predictedListToResponse(service.findUrl(url)), HttpStatus.OK);
 
-        }
+        } else
+            return new ResponseEntity<>(mapper.predictedListToResponse(service.predictDangerPercentage(url)), HttpStatus.OK);
 
-        return null;
     }
 }
