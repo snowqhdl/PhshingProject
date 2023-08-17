@@ -19,8 +19,6 @@ public class ListService {
     private final PredictedListRepository predictedRepo;
     private final RestTemplate restTemplate;
 
-    private final String AI_SERVER = "http://your-ai-server-ip:5000/predict";
-
     public String predictDangerPercentage(String url) {
         if (checkWhiteUrl(url)) {
             return "Whitelisted site";
@@ -30,6 +28,7 @@ public class ListService {
             return String.valueOf(findUrl(url).getPercentage());
         } else {
             // AI 서버로 API 호출
+            String AI_SERVER = "http://your-ai-server-ip:5000/predict";
             ResponseEntity<String> response = restTemplate.postForEntity(AI_SERVER, url, String.class);
             return response.getBody();
         }
