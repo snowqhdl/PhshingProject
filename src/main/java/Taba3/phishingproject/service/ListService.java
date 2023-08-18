@@ -5,7 +5,9 @@ import Taba3.phishingproject.repository.BlackListRepository;
 import Taba3.phishingproject.repository.PredictedListRepository;
 import Taba3.phishingproject.repository.WhiteListRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -14,12 +16,18 @@ import org.springframework.web.client.RestTemplate;
 @Transactional
 @RequiredArgsConstructor
 public class ListService {
+
     private final BlackListRepository blackRepo;
     private final WhiteListRepository whiteRepo;
     private final PredictedListRepository predictedRepo;
-    private final RestTemplate restTemplate;
 
     public String predictDangerPercentage(String url) {
+        String AI_SERVER = "http://127.0.0.1:5001/predict";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String requestBody = "{\"url\": \"" + url + "\"}";
+        HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
+        RestTemplate restTemplate = new RestTemplate();
         if (checkWhiteUrl(url)) {
             return "Whitelisted site";
         } else if (checkBlackUrl(url)) {
@@ -28,8 +36,7 @@ public class ListService {
             return String.valueOf(findUrl(url).getPercentage());
         } else {
             // AI 서버로 API 호출
-            String AI_SERVER = "http://your-ai-server-ip:5000/predict";
-            ResponseEntity<String> response = restTemplate.postForEntity(AI_SERVER, url, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(AI_SERVER, HttpMethod.POST, requestEntity, String.class);
             return response.getBody();
         }
     }
