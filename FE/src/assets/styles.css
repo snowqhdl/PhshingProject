@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Macondo&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  height: 100vh;
+  background: #cddbef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app {
+  position: relative;
+}
+
+.logo {
+  width: 500px;
+  display: block;
+}
+
+.form {
+  position: absolute;
+  top: 125px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 400px;
+  height: fit-content;
+  width: fit-content;
+  margin: auto;
+  padding: 8px 16px;
+  background: #fff;
+  border-radius: 32px;
+  box-shadow: 2px 6px 12px rgba(153, 153, 153, 0.6);
+}
+
+.input {
+  width: 500px;
+  padding: 8px;
+  font-size: 24px;
+  border: none;
+}
+
+.input::placeholder {
+  opacity: 0.3;
+  text-align: center;
+}
+
+.button {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 16px;
+  height: fit-content;
+  margin: auto;
+  border: none;
+  background: none;
+}
+
+.icon {
+  width: 32px;
+}
+
+.result {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  width: 900px;
+  height: 200px;
+  background: #cddbef;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.text {
+  font-family: 'Macondo', cursive;
+  color: #3b6aa0;
+  text-align: center;
+  font-size: 48px;
+  -webkit-text-stroke: 2px #000;
+  margin: 8px;
+  transform: scaleX(1.5);
+  letter-spacing: -2px;
+}
+
+.back {
+  width: 32px;
+  display: block;
+  margin: auto;
+}

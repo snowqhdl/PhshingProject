@@ -29,15 +29,15 @@ public class ListService {
         HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
         RestTemplate restTemplate = new RestTemplate();
         if (checkWhiteUrl(url)) {
-            return "Whitelisted site";
-        } else if (checkBlackUrl(url)) {
-            return "Blacklisted site";
+            return "White site";
+        } else if (checkBlackUrl(url)){
+            return "Phishing site";
         } else if (checkPredictedUrl(url)) {
             return String.valueOf(findUrl(url).getPercentage());
         } else {
             // AI 서버로 API 호출
-            ResponseEntity<String> response = restTemplate.exchange(AI_SERVER, HttpMethod.POST, requestEntity, String.class);
-            return response.getBody();
+       ResponseEntity<String> response = restTemplate.exchange(AI_SERVER, HttpMethod.POST, requestEntity, String.class);
+       return response.getBody();
         }
     }
 
