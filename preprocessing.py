@@ -1,13 +1,17 @@
-from urllib import parse
 from tld import get_tld
+from urllib import parse
+from typing import Optional
 from bs4 import BeautifulSoup
 from selenium import webdriver
-import whois
-import requests
+import numpy as np
+import re
+import csv
 import ssl
+import whois
 import socket
-import datetime
 import psutil
+import requests
+import datetime
 import subprocess
 
 ## URL이 가르키는 URL 반환하는 함수
@@ -16,22 +20,22 @@ def get_origin_url(url: str):
     parsed_url = requests.utils.urlparse(url)
     host = parsed_url.netloc.split(':')[0]
     try:
-          socket.gethostbyname(host)
-          return requests.head(url, allow_redirects=True).url
-    except (socket.gaierror, requests.exceptions.RequestException):
-          return None
+        socket.gethostbyname(host)
+        return requests.head(url, allow_redirects=True, timeout=15).url
+    except (socket.gaierror, requests.exceptions.RequestException, requests.exceptions.Timeout):
+        return None
 
-'''
 ## 1.1. ip주소 여부를 통한 판단 기준
 ## 정상 : 1 / 피싱 : -1
-def ip_dec(url: str):
-    netloc_arr = parse.urlparse(url).netloc.split('.')
-    try:
-        int(netloc_arr[-1], 0)
+
+def ip_dec(url: str) -> int:
+    netloc = parse.urlparse(url).netloc
+    ip_pattern = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
+
+    if ip_pattern.match(netloc):
         return -1
-    except ValueError:
+    else:
         return 1
-'''
 
 ## 1.2. 길이를 통한 판단
 ## 정상 : 1 / 의심 : 0 / 피싱 : -1
@@ -43,19 +47,15 @@ def len_dec(url: str):
     else:
         return -1
 
-'''
 ## 1.3. http redirection 여부를 통한 판단 기준
-##      URL이 가리키는 최종 주소를 이용해서 판단하기 때문에 불필요
 ## 정상 : 1 / 피싱 : -1
-def tiny_dec(url: str):
-    response = requests.get(url)
+def tiny_dec(response: requests.Response):
     ## redirection 탐지
     for res in response.history:
         if res.status_code == 301 and res.status_code == 302:
             return -1
     else:
         return 1
-'''
 
 ## 1.4. @ 존재 여부를 통한 판단 기준
 ## 정상 : 1 / 피싱 : -1
@@ -101,6 +101,7 @@ def subdo_dec(url: str):
             else:
                 return -1
 
+'''
 ## 1.8.1. SSL final state를 통한 판단 기준
 ##        URL의 hostname을 통해 인증서 작성 기관을 보고 신뢰성 판별
 ## 정상 : 1 / 의심 : 0 / 피싱 : -1
@@ -131,58 +132,64 @@ def ssl_fs_dec(url: str):
         return -1
 '''
 ## 1.9. 도메인 유효 기간을 통한 판단 기준
-def is_phishing_site(url):
+def domain_duration_dec(w: whois.WhoisEntry):
     try:
-        # URL에서 도메인 이름 추출
-        domain_name = urlparse(url).netloc
-        # 도메인의 WHOIS 정보 조회
-        domain_info = whois.whois(domain_name)
+        ## 도메인 유효 기간 계산에 필요한 값
+        expiration_date = w.expiration_date
+        creation_date = w.creation_date
 
-        # 도메인 유효 기간 계산
-        expiration_date = domain_info.expiration_date
-        creation_date = domain_info.creation_date
-
-        # 만약 여러 날짜가 반환되면 첫 번째 날짜를 선택
+        ## 둘 이상의 값이 존재할 경우에 대한 처리
         if isinstance(expiration_date, list):
             expiration_date = expiration_date[-1]
         if isinstance(creation_date, list):
             creation_date = creation_date[0]
 
-        # 유효 기간이 365일 미만이면 피싱 사이트로 판별
+        ## 유효 기간이 1년(365일) 미만이면 피싱 사이트로 판별
         if (expiration_date - creation_date).days < 365:
             return -1
         else:
             return 1
     except:
-        # 예외 발생 시 (예: 도메인 정보를 찾을 수 없는 경우) 정상 사이트로 판별
-        return 1
+        # 예외 발생 시 (예: 도메인 정보를 찾을 수 없는 경우) 의심 사이트로 판별
+        return 0
 
 ## 1.10. favicon을 통한 판단 기준
-def check_favicon(url):
+def favicon_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None) -> int:
+    favicon_url = None
+
     try:
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # favicon을 가리키는 link 태그 찾기
-        favicon_link = soup.find('link', rel=lambda x: x and 'icon' in x)
+        ## BeautifulSoup 사용가능시
+        if soup:
+            favicon_link = soup.find('link', rel=lambda x: x and 'icon' in x)
+            
+            if favicon_link and 'href' in favicon_link.attrs:
+                favicon_url = favicon_link['href']
 
-        # link 태그가 없거나 href 속성이 없는 경우 정상 사이트로 판단
-        if favicon_link is None or 'href' not in favicon_link.attrs:
+        ## BeautifulSoup 사용 불가, Selenium 사용 가능시
+        elif options:
+            with webdriver.Chrome(options=options) as driver:
+                driver.get(url)
+                favicon_link_element = driver.find_element_by_xpath("//link[contains(@rel, 'icon')]")
+                
+                if favicon_link_element:
+                    favicon_url = favicon_link_element.get_attribute('href')
+        ## 모두 사용 불가시 판단 불가
+        else:
+            return 0
+
+        ## favicon_url의 존재 여부 및 URL과 도메인 일치 판단
+        if favicon_url:
+            if favicon_url.startswith('http') or favicon_url.startswith('//'):
+                favicon_domain = urlparse(favicon_url).netloc
+                original_domain = urlparse(url).netloc
+
+                ## favicon 도메인과 원본 도메인이 다르면 피싱 사이트로 판단
+                if favicon_domain != original_domain:
+                    return -1
             return 1
-        
-        favicon_url = favicon_link['href']
-        
-        # favicon URL이 절대 경로인지 확인
-        if favicon_url.startswith('http') or favicon_url.startswith('//'):
-            favicon_domain = urlparse(favicon_url).netloc
-            original_domain = urlparse(url).netloc
-
-            # favicon 도메인과 원본 도메인이 다른 경우 피싱 사이트로 판단
-            if favicon_domain != original_domain:
-                return -1
-
-        return 1
-'''
+        ## favicon이 존재하면서 그 도메인이 존재하지 않는 경우 판단 불가
+        else:
+            return 0
 
     except Exception as e:
         print("An error occurred:", str(e))
@@ -192,7 +199,7 @@ def check_favicon(url):
 ##       HTTPS 표준 포트 연결 가능 여부 판단
 ##       HTTPS 표준 포트 연결 불가일 경우 예비 포트로 진입
 ## 정상 : 1 / 의심 : 0 / 피싱 : -1
-def non_std_port(url: str):
+def port_dec(url: str):
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)  # 타임아웃 설정
@@ -210,22 +217,22 @@ def non_std_port(url: str):
               return -1
 
 ## 2.1. 사이트 내 외부 URL 비율을 통한 판단 기준
-def reque_dec(url):
+def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None) -> int:
     try:
-        # WebDriver 인스턴스를 생성합니다.
-        # 이 예제에서는 Chrome 드라이버를 사용합니다.
-        driver = webdriver.Chrome(executable_path="path_to_chromedriver")
+        ## bs4 사용 결과물을 받은 경우
+        if soup
+            pass
+        ## bs4 사용이 불가능해서 selenium을 통해 소스코드를 받아와서 파싱
+        elif options:
+            driver = webdriver.Chrome(executable_path="chromedriver.exe", chrome_options=options)
+            driver.get(url)
+            page_source = driver.page_source
+            driver.quit()
+            soup = BeautifulSoup(page_source, "html.parser")
+        ## 두 방법 모두 사용 불가능해서 판단이 불가능한 경우
+        else:
+            return 0
 
-        # URL의 웹페이지를 로드합니다.
-        driver.get(url)
-
-        # 동적으로 로드된 페이지의 소스를 가져옵니다.
-        page_source = driver.page_source
-
-        # WebDriver 인스턴스를 종료합니다.
-        driver.quit()
-
-        soup = BeautifulSoup(page_source, "html.parser")
         base_domain = urlparse(url).netloc
         external_objects_count = 0
         total_objects_count = 0
@@ -236,9 +243,9 @@ def reque_dec(url):
                 total_objects_count += 1
                 if base_domain not in urljoin(url, src):
                     external_objects_count += 1
-
+        ## 내부에 태그가 존재하지 않는 경우 판단 불가
         if total_objects_count == 0:
-            return -1
+            return 0
         
         ratio = (external_objects_count / total_objects_count) * 100
 
@@ -248,111 +255,190 @@ def reque_dec(url):
             return 0
         else:
             return -1
+
     except Exception as e:
-        print(f"Error occurred: {e}")
+        print(f"Error: {e}")
         return 0
 
-## 2.6.1. 웹사이트에서 mailto 허용 여부를 통한 판단 기준
-def mailto_dec(url: str):
-    try:
-        ## requests를 이용한 웹사이트 응답 요청
-        response = requests.get(url)
-        response.raise_for_status()
 
+## 2.6.1. 웹사이트에서 mailto 허용 여부를 통한 판단 기준
+def mailto_dec(response: requests.Response):
+    try:
         ## mailto: 링크가 포함되어 있는지 확인
         if 'mailto:' in response.text:
             return 0
         else:
             return 1
     ## 요청에서 오류 발생
-    except requests.RequestException as e:
-        print(f"Error fetching the website: {e}")
+    except AttributeError as e:
         return -1
 
 ## 2.6.2. 웹사이트에서 mail 사용 여부를 통한 판단 기준
-def mail_dec(url: str):
+def mail_dec(response: requests.Response):
     try:
-        ## 
-        response = requests.get(url)
-        response.raise_for_status()
-        
         if "mail(" in response.text:
             return -1  # mail() 사용
         else:
             return 1  # mail() 사용하지 않음
 
-    except requests.RequestException as e:
-        print(f"Error fetching the website: {e}")
-        return 0  # 서버 접근 시도 시 막힘
+    except AttributeError as e:
+        return 0
+
+## 3.1. 웹사이트 포워딩을 통한 판단 기준
+##      redirection 횟수를 기준으로 1번 이하이면 안전, 4번 이상이면 피싱
+##      2번 이상 4번 미만일 경우 의심 사이트
+def redir_dec(response: requests.Response):
+    try:
+        if len(response.history) < 2:
+            return 1
+        elif len(response.history) < 4:
+            return 0
+        else:
+            return -1
+    except AttributeError as e:
+        return 0
 
 ## 3.3. 오른쪽 클릭 비활성화를 통한 판단 기준
-def right_dec(url):
-    # 먼저 BeautifulSoup으로 시도합니다.
+def right_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None):
     try:
-        response = requests.get(url)
-        soup = BeautifulSoup(response.content, "html.parser")
-        
-        if soup.find(lambda tag: tag.name.lower() in ["body", "html"] and 
-                      tag.has_attr("oncontextmenu") and 
-                      "return false" in tag.attrs["oncontextmenu"].lower()):
-            return -1
-
-        scripts = soup.find_all("script")
-        for script in scripts:
-            if script.string and "event.button == 2" in script.string:
-                return -1
-    except Exception as e:
-        print(f"Error with BeautifulSoup: {e}")
-
-    # BeautifulSoup으로 우클릭 방지 코드를 찾지 못했다면 Selenium으로 시도합니다.
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu") 
-    options.add_argument("--no-sandbox")
-
-    try:
-        with webdriver.Chrome(executable_path="YOUR_CHROMEDRIVER_PATH", options=options) as driver:
-            driver.get(url)
-
-            body_elements = driver.find_elements_by_xpath("//body[@oncontextmenu='return false']") + \
-                            driver.find_elements_by_xpath("//html[@oncontextmenu='return false']")
-            if body_elements:
+        ## BeautifulSoup 사용
+        if soup:
+            if soup.find(lambda tag: tag.name.lower() in ["body", "html"] and 
+                          tag.has_attr("oncontextmenu") and 
+                          "return false" in tag.attrs["oncontextmenu"].lower()):
                 return -1
 
-            scripts = driver.find_elements_by_tag_name("script")
-            for script in scripts:
-                if script.get_attribute('innerHTML') and "event.button == 2" in script.get_attribute('innerHTML'):
+            for script in soup.find_all("script"):
+                if script.string and "event.button == 2" in script.string:
+                    return -1
+            return 1
+
+        ## Selenium 사용
+        elif options:
+            with webdriver.Chrome(executable_path="chromedriver.exe", options=options) as driver:
+                driver.get(url)  # Missing line: Visit the URL using the driver
+                
+                body_elements = driver.find_elements_by_xpath("//body[@oncontextmenu='return false']") + \
+                                driver.find_elements_by_xpath("//html[@oncontextmenu='return false']")
+                
+                if body_elements:
                     return -1
 
-            return 1
+                for script in driver.find_elements_by_tag_name("script"):
+                    if "event.button == 2" in (script.get_attribute('innerHTML') or ''):
+                        return -1
+
+                return 1
+        ## 둘 다 사용 불가한 경우 판단 불가
+        else:
+            return 0
+
     except Exception as e:
-        print(f"Error with Selenium: {e}")
+        print(f"Error in right_dec: {e}")
+        return 0
+
+
+    ## soup와 options 둘 다 None이라면 의심
+    else:
         return 0
 
 ## 4.1. 도메인 수명을 통한 판단 기준
 ##      피싱사이트 수명이 짧은 것을 이용
-
-def domain_age_check(url: str):
-    try:
-        w = whois.whois(url)
-
-        ## 도메인의 생성 날짜 또는 만료 날짜가 없는 경우
-        if w.creation_date is None or w.expiration_date is None:
-            return 0
-        elif isinstance(w.creation_date, list):
-            creation_date = w.creation_date[0]
-        else:
-            creation_date = w.creation_date
+def age_dec(w: whois.WhoisEntry):
+    ## whois 사용 불가 사이트
+    creation_date = w.creation_date
+    if creation_date:
+        if isinstance(creation_date, list):
+            creation_date = creation_date[0]
             
         current_date = datetime.datetime.now()
         domain_age = (current_date - creation_date).days
-        
-        if domain_age < 6 * 30:  # 대략 6개월을 날짜로 계산
+
+        ## 한 달을 30일로 해서 6개월 미만인지 판단
+        if domain_age < 6 * 30:
             return -1
         else:
-            return 1  # 정상 사이트
-
-    ## 예외 발생하는 경우 whois를 지원하지 않는 경우
-    except Exception as e:
-        print(f"Error occurred: {e}")
+            return 1
+    else:
         return 0
+
+class URLFeature:
+    def __init__(self, url: str):
+        self.url = url
+        self.origin = get_origin_url(url)
+        if self.origin:
+            self.response = requests.get(url)
+            try:
+                self.w = whois.whois(self.origin)
+            except:
+                self.w = None
+                
+            try:
+                self.soup = BeautifulSoup(self.response.content, "html.parser")
+            except:
+                self.soup = None
+                
+            try:
+                self.options = webdriver.ChromeOptions()
+            except:
+                self.options = None
+            
+            self.__data = [ip_dec(self.url),
+                           len_dec(self.url),
+                           tiny_dec(self.response),
+                           at_sym_dec(self.url),
+                           red_dec(self.url),
+                           dash_dec(self.url),
+                           subdo_dec(self.url),
+                           domain_duration_dec(self.w),
+                           favicon_dec(self.origin, self.soup, self.options)
+                           port_dec(self.origin),
+                           reque_dec(self.origin, self.soup, self.options),
+                           mailto_dec(self.response),
+                           mail_dec(self.response),
+                           redir_dec(self.response),
+                           right_dec(self.origin, self.soup, self.options),
+                           age_dec(self.w)]
+        else:
+            self.__data = None
+
+    @property
+    def data(self):
+        return self.__data
+
+    def __getitem__(self, index):
+        if self.__data:
+            return self.__data[index]
+        else:
+            return None
+
+    def __len__(self):
+        if self.__data:
+            return len(self.__data)
+        else:
+            return 0
+        
+    def __repr__(self):
+        return repr(self.__data)
+    
+
+features_list = []
+
+with open("verified_online.csv", 'r') as csvfile:
+    reader = csv.reader(csvfile)
+    next(reader)
+    for row in reader:
+        feature = URLFeature(row[1])
+
+        if feature and feature.data:
+            features_list.append(feature.data)
+
+# 리스트를 numpy 배열로 변환
+features_array = np.array(features_list)
+    
+# npy 파일로 저장
+np.save("output_features.npy", features_array)
+
+
+
+    
