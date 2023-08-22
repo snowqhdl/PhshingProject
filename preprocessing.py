@@ -220,7 +220,7 @@ def port_dec(url: str):
 def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None) -> int:
     try:
         ## bs4 사용 결과물을 받은 경우
-        if soup
+        if soup:
             pass
         ## bs4 사용이 불가능해서 selenium을 통해 소스코드를 받아와서 파싱
         elif options:
@@ -391,7 +391,7 @@ class URLFeature:
                            dash_dec(self.url),
                            subdo_dec(self.url),
                            domain_duration_dec(self.w),
-                           favicon_dec(self.origin, self.soup, self.options)
+                           favicon_dec(self.origin, self.soup, self.options),
                            port_dec(self.origin),
                            reque_dec(self.origin, self.soup, self.options),
                            mailto_dec(self.response),
@@ -423,6 +423,7 @@ class URLFeature:
     
 
 features_list = []
+n = 0
 
 with open("verified_online.csv", 'r') as csvfile:
     reader = csv.reader(csvfile)
@@ -432,12 +433,13 @@ with open("verified_online.csv", 'r') as csvfile:
 
         if feature and feature.data:
             features_list.append(feature.data)
-
-# 리스트를 numpy 배열로 변환
-features_array = np.array(features_list)
+            n += 1
+        if n % 10 == 0:
+            ## 리스트를 numpy 배열로 변환
+            features_array = np.array(features_list)
     
-# npy 파일로 저장
-np.save("output_features.npy", features_array)
+            # npy 파일로 저장
+            np.save(f"output_features_{n % 10}.npy", features_array)
 
 
 
