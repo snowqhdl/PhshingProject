@@ -5,7 +5,7 @@
         {{ props.res }}
       </p>
       <p v-if="props.percent" class="text">{{ props.percent }}%</p>
-      <img class="back" src="/arrow-left.png" alt="" />
+      <button class="back">X</button>
     </div>
   </div>
 </template>
