@@ -19,7 +19,7 @@ body {
 }
 .logo {
   overflow : hidden;
-  margin: 0 auto 50px;
+  margin: 0 auto 40px;
   width: 80%;
   height: 200px;
   text-align: center;
@@ -53,6 +53,7 @@ body {
 }
 
 .input::placeholder {
+  font-family: 'Roboto', sans-serif;
   opacity: 0.3;
   text-align: left;
 }
@@ -99,11 +100,10 @@ body {
 
 .text {
   width: 80%;
-  font-family: 'Macondo', cursive;
+  font-family: 'Roboto', sans-serif;
   color: #3b6aa0;
   text-align: center;
   font-size: 6vw;
-  -webkit-text-stroke: 2px #000;
   margin: 8px;
   letter-spacing: -2px;
 }
@@ -128,12 +128,31 @@ body {
   font-size: 30px;
 }
 
-.intro{
+.message{
   font-family: 'Roboto', sans-serif;
+  color: #44505c4f;
   font-size: 20px;
   width: 80vw;
   padding: 0 32px 10px;
-  margin: 0 auto;
+  margin: 8px auto;
+}
+.warning{
+  font-family: 'Roboto', sans-serif;
+  color: #44505c4f;
+  font-size: 20px;
+  width: 80vw;
+  padding: 0 32px 10px;
+  margin: 8px auto;
+}
+.trust-message {
+  font-family: 'Roboto', sans-serif;
+  color: #5d7daa;
+  font-size: 1.1vw;
+  width: 80%;
+  margin: 10px auto;
+  text-align: center;
+  position: fixed;
+  bottom: 4%;
 }
 
 @media screen and (max-width:600px){
