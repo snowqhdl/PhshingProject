@@ -215,8 +215,6 @@ def port_dec(url: str):
         except (socket.timeout, ConnectionRefusedError, socket.gaierror, Exception):
               return -1
 
-    ex
-
 ## 2.1. 사이트 내 외부 URL 비율을 통한 판단 기준
 def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None) -> int:
     try:
