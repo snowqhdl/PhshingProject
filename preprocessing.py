@@ -14,21 +14,21 @@ import requests
 import datetime
 import subprocess
 
-## URL이 가르키는 URL 반환하는 함수
-## 단축된 URL일 경우 원URL, 일반 URL일 경우 자신 반환
-def get_origin_url(url: str):
-    parsed_url = requests.utils.urlparse(url)
+## URL의 최종 URL 반환하는 함수
+def get_origin_url(response: requests.Response):
+    parsed_url = requests.utils.urlparse(response.url)
     host = parsed_url.netloc.split(':')[0]
     try:
+        ## 연결 상태 확인
         socket.gethostbyname(host)
-        return requests.head(url, allow_redirects=True, timeout=15).url
-    except (socket.gaierror, requests.exceptions.RequestException, requests.exceptions.Timeout):
+        return response.url
+    except (socket.gaierror, requests.exceptions.RequestException, Exception):
         return None
 
 ## 1.1. ip주소 여부를 통한 판단 기준
 ## 정상 : 1 / 피싱 : -1
 
-def ip_dec(url: str) -> int:
+def ip_dec(url: str):
     netloc = parse.urlparse(url).netloc
     ip_pattern = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
 
@@ -180,8 +180,8 @@ def favicon_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optiona
         ## favicon_url의 존재 여부 및 URL과 도메인 일치 판단
         if favicon_url:
             if favicon_url.startswith('http') or favicon_url.startswith('//'):
-                favicon_domain = urlparse(favicon_url).netloc
-                original_domain = urlparse(url).netloc
+                favicon_domain = parse.urlparse(favicon_url).netloc
+                original_domain = parse.urlparse(url).netloc
 
                 ## favicon 도메인과 원본 도메인이 다르면 피싱 사이트로 판단
                 if favicon_domain != original_domain:
@@ -192,7 +192,6 @@ def favicon_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optiona
             return 0
 
     except Exception as e:
-        print("An error occurred:", str(e))
         return 0  # 에러 발생 시 0 반환
 
 ## 1.11. 비표준 포트 사용 여부를 통한 판단 기준
@@ -206,15 +205,17 @@ def port_dec(url: str):
         sock.connect((url, 443))
         sock.close()
         return 1
-    except (socket.timeout, ConnectionRefusedError, socket.gaierror):
+    except (socket.timeout, ConnectionRefusedError, socket.gaierror, Exception):
         try:
               sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
               sock.settimeout(1)  # 타임아웃 설정
               sock.connect((url, 8443))
               sock.close()
               return 0
-        except (socket.timeout, ConnectionRefusedError, socket.gaierror):
+        except (socket.timeout, ConnectionRefusedError, socket.gaierror, Exception):
               return -1
+
+    ex
 
 ## 2.1. 사이트 내 외부 URL 비율을 통한 판단 기준
 def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None) -> int:
@@ -233,7 +234,7 @@ def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optio
         else:
             return 0
 
-        base_domain = urlparse(url).netloc
+        base_domain = parse.urlparse(url).netloc
         external_objects_count = 0
         total_objects_count = 0
 
@@ -241,7 +242,7 @@ def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optio
             src = tag.get('src')
             if src:
                 total_objects_count += 1
-                if base_domain not in urljoin(url, src):
+                if base_domain not in parse.urljoin(url, src):
                     external_objects_count += 1
         ## 내부에 태그가 존재하지 않는 경우 판단 불가
         if total_objects_count == 0:
@@ -257,7 +258,6 @@ def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optio
             return -1
 
     except Exception as e:
-        print(f"Error: {e}")
         return 0
 
 
@@ -334,9 +334,7 @@ def right_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[
             return 0
 
     except Exception as e:
-        print(f"Error in right_dec: {e}")
         return 0
-
 
     ## soup와 options 둘 다 None이라면 의심
     else:
@@ -345,31 +343,46 @@ def right_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[
 ## 4.1. 도메인 수명을 통한 판단 기준
 ##      피싱사이트 수명이 짧은 것을 이용
 def age_dec(w: whois.WhoisEntry):
-    ## whois 사용 불가 사이트
-    creation_date = w.creation_date
-    if creation_date:
-        if isinstance(creation_date, list):
-            creation_date = creation_date[0]
-            
-        current_date = datetime.datetime.now()
-        domain_age = (current_date - creation_date).days
+    ## whois 사용 가능
+    try:
+        if w:
+            creation_date = w.creation_date
+            if creation_date and not isinstance(creation_date, str):
+                if isinstance(creation_date, list):
+                    creation_date = creation_date[0]
 
-        ## 한 달을 30일로 해서 6개월 미만인지 판단
-        if domain_age < 6 * 30:
-            return -1
+                ## UTC 시간대를 사용하여 현재 날짜와 시간 불러옴
+                current_date = datetime.datetime.now(datetime.timezone.utc)
+                ## creation_date가 시간대 정보를 가지고 있는지 확인
+                if creation_date.tzinfo:
+                    domain_age = (current_date - creation_date).days
+                else:
+                    domain_age = (current_date - creation_date.replace(tzinfo=datetime.timezone.utc)).days
+
+                ## 한 달을 30일로 계산하여 6개월 미만인지 판단
+                if domain_age < 6 * 30:
+                    return -1
+                else:
+                    return 1
+            else:
+                return 0
+        ## whois 사용 불가
         else:
-            return 1
-    else:
+            return 0
+    except:
         return 0
-
 class URLFeature:
     def __init__(self, url: str):
         self.url = url
-        self.origin = get_origin_url(url)
-        if self.origin:
+        try:
             self.response = requests.get(url)
+        except:
+            self.response = None
+            
+        if self.response:
+            self.origin = get_origin_url(self.response)
             try:
-                self.w = whois.whois(self.origin)
+                self.w = whois.whois(self.origin, timeout = 15)
             except:
                 self.w = None
                 
@@ -393,7 +406,7 @@ class URLFeature:
                            domain_duration_dec(self.w),
                            favicon_dec(self.origin, self.soup, self.options),
                            port_dec(self.origin),
-                           reque_dec(self.origin, self.soup, self.options),
+                           url_ratio_dec(self.origin, self.soup, self.options),
                            mailto_dec(self.response),
                            mail_dec(self.response),
                            redir_dec(self.response),
@@ -423,23 +436,28 @@ class URLFeature:
     
 
 features_list = []
-n = 0
+labels_list = []
+path = "C:\\Users\\Admin\\Desktop\\phishing_AI\\npy\\"
+n = 1
 
 with open("verified_online.csv", 'r') as csvfile:
     reader = csv.reader(csvfile)
     next(reader)
     for row in reader:
         feature = URLFeature(row[1])
-
+        label = 1
         if feature and feature.data:
             features_list.append(feature.data)
+            labels_list.append(label)
             n += 1
         if n % 10 == 0:
             ## 리스트를 numpy 배열로 변환
             features_array = np.array(features_list)
+            labels_array = np.array(labels_list)
     
             # npy 파일로 저장
-            np.save(f"output_features_{n % 10}.npy", features_array)
+            np.save(f"{path}black_data_{n // 10}.npy", features_array)
+            np.save(f"{path}black_label_{n // 10}.npy", labels_array)
 
 
 
