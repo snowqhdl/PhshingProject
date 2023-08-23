@@ -1,8 +1,11 @@
 <template>
   <div class="app">
-    <img class="logo" src="/logo.png" alt="" />
+    <div class="logo" >
+    <img src="/logo.png" alt="logo" />
+  </div>
+  <p class="intro">Check the 'URL' to protect your private information from phishing site.</p>
     <form class="form" @submit.prevent="submit">
-      <input class="input" type="text" v-model="urlInput" placeholder="URL을 입력해주세요." />
+      <input class="input" type="text" v-model="urlInput" placeholder="type URL" />
       <button class="button"><img class="icon" src="/search.png" alt="" /></button>
     </form>
   </div>
@@ -16,6 +19,7 @@ import { ref } from 'vue'
 import axios from 'axios'
 
 import ResultModal from './components/ResultModal.vue'
+
 
 const urlInput = ref('')
 const result = ref(false)
