@@ -16,6 +16,6 @@ public class BlackList {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long blackUrlId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String url;
 }

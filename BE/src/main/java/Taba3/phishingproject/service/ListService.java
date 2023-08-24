@@ -27,16 +27,17 @@ public class ListService {
         HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
         RestTemplate restTemplate = new RestTemplate();
         if (checkWhiteUrl(url)) {
-            return "안전한 사이트입니다. 안심하고 이용하세요!";
+            return "white site";
         } else if (checkBlackUrl(url)){
-            return "주의! 이 사이트는 피싱 위험이 있습니다!";
+            return "black site";
         } else if (checkPredictedUrl(url)) {
-            return "주의! 이 사이트는 피싱 위험이 있습니다!";
+            return "{\"result\": \"" + findUrl(url).getPercentage() + "\"}";
         } else {
             // AI 서버로 API 호출
        ResponseEntity<String> response = restTemplate.exchange(AI_SERVER, HttpMethod.POST, requestEntity, String.class);
        return response.getBody();
         }
+
     }
 
 

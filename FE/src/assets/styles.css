@@ -8,7 +8,7 @@
 }
 body {
   height: 100vh;
-  background: #cddbef;
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,7 +38,8 @@ body {
   padding: 12px 16px 12px 12px;
   background: #fff;
   border-radius: 40px;
-  box-shadow: 2px 6px 12px hwb(203 4% 82% / 0.3);
+  border: 1.5px solid #535f6b;
+  /* box-shadow: 2px 6px 12px hwb(203 4% 82% / 0.3); */
 }
 
 .input {
@@ -52,6 +53,11 @@ body {
   outline:  solid 2px #44505c4f;
 }
 
+.verify-icon{
+  width: 50px; /* 조정 가능한 이미지 크기 */
+  margin-bottom: 8px; /* 이미지와 텍스트 간격 조정 */
+
+}
 .input::placeholder {
   font-family: 'Roboto', sans-serif;
   opacity: 0.3;
@@ -86,26 +92,27 @@ body {
 }
 
 .modal {
-  width: 80%;
+  width: 68%;
   height: 300px;
   border-radius: 20px;
   z-index: 10;
-  background: #cddbef;
+  background: #ffffff;
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  box-shadow: 2px 6px 12px hwb(203 4% 82% / 0.3);
+  /* box-shadow: 2px 6px 12px hwb(203 4% 82% / 0.3); */
+  border: 1px solid #94a0ac;
 }
 
 .text {
   width: 80%;
   font-family: 'Roboto', sans-serif;
-  color: #3b6aa0;
+  color: #00366C;
   text-align: center;
   font-size: 6vw;
   margin: 8px;
-  letter-spacing: -2px;
+  letter-spacing: -5px;
 }
 
 .inner{
@@ -128,6 +135,8 @@ body {
   font-size: 30px;
 }
 
+
+
 .message{
   font-family: 'Roboto', sans-serif;
   color: #44505c4f;
@@ -146,13 +155,20 @@ body {
 }
 .trust-message {
   font-family: 'Roboto', sans-serif;
-  color: #5d7daa;
-  font-size: 1.1vw;
+  color: #00366C;
+  font-size: 1.2vw;
   width: 80%;
   margin: 10px auto;
   text-align: center;
   position: fixed;
   bottom: 4%;
+}
+
+.ai-warn{
+  font-family: 'Roboto', sans-serif;
+  text-align: center;
+  font-size: 20px;
+  margin: 15px auto;
 }
 
 @media screen and (max-width:600px){

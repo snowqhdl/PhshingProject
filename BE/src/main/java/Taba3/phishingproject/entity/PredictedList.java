@@ -15,7 +15,7 @@ public class PredictedList {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long predictedUrlId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String url;
 
     @Column(nullable = false)
