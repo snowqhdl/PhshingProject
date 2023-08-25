@@ -13,6 +13,7 @@ import whois
 import socket
 import requests
 import datetime
+import ipaddress
 
 ## URL의 최종 URL 반환하는 함수
 def get_origin_url(response: requests.Response):
@@ -115,22 +116,41 @@ def dash_dec(url: str) -> int:
 ## 1.7. 하위, 다중 하위 도메인 여부를 통한 판단 기준
 ## 정상 : 1 / 의심 : 0 / 피싱 : -1
 def subdo_dec(url: str) -> int:
-    netloc_arr = parse.urlparse(url).netloc.split('.')
-    ## domain 부분에 ip 형식이 들어있을 경우
-    ##get_tld가 TLD name과 일치하는 형식이 존재하지 않아 생기는 오류 방지
     try:
-        int(netloc_arr[-1], 0)
-        return -1
-    except ValueError:
-        subdomain = get_tld(url.replace("www.", "") if "www." in url[:12] else url, as_object = True).subdomain
-        if subdomain == '':
-            return 1
-        else:
-            dot = subdomain.count('.')
-            if dot == 0:
-                return 0
-            else:
+        netloc = parse.urlparse(url).netloc
+        path = parse.urlparse(url).path
+    
+        ## IP 주소 판단
+        ip_pattern = re.compile(r'(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(?:(?:[0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(?:ffff(?::0{1,4}){0,1}:){0,1}(?:(25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|(?:(?:[0-9a-fA-F]{1,4}:){1,4}:|::(?:ffff(?::0{1,4}){0,1}:){0,1})((25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9]))')
+        for match in ip_pattern.findall(netloc + path):
+            if isinstance(match, tuple):
+                match = match[0]
+            try:
+                ipaddress.ip_address(match)
                 return -1
+            except ValueError:
+                pass
+
+        ## 'www.' or 'ww숫자.'부분이 존재하면 제거.
+        if url.startswith("www."):
+            sanitized_url = url.replace("www.", "", 1)
+        else:
+            sanitized_url = re.sub(r'^ww\d+\.', '', url, count=1)
+    
+        try:
+            subdomain = get_tld(sanitized_url, as_object=True).subdomain
+        except (TldBadUrl, TldDomainNotFound, TldImproperlyConfigured):
+            return -1
+
+        ## 서브도메인 판단
+        if not subdomain:
+            return 1
+        elif '.' in subdomain:
+            return -1
+        else:
+            return 0
+    except:
+        return -1
 
 ## 1.8. SSL final state를 통한 판단 기준
 ##      인증서 발급 기관
@@ -513,10 +533,10 @@ class URLFeature:
 
 features_list = []
 labels_list = []
-path = "C:\\Users\\Admin\\Desktop\\training\\"
+path = "C:\\Users\\Admin\\Desktop\\최종\\1\\"
 n = 0
 
-with open(f"{path}training_data_120k_140k_final.csv", 'r') as csvfile:
+with open(f"{path}training_data_0_20k_final.csv", 'r') as csvfile:
     reader = csv.reader(csvfile)
     next(reader)
     for row in reader:
