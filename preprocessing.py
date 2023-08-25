@@ -1,18 +1,18 @@
 from tld import get_tld
 from urllib import parse
+from OpenSSL import crypto
 from typing import Optional
 from bs4 import BeautifulSoup
 from selenium import webdriver
 import numpy as np
+import os
 import re
 import csv
 import ssl
 import whois
 import socket
-import psutil
 import requests
 import datetime
-import subprocess
 
 ## URL의 최종 URL 반환하는 함수
 def get_origin_url(response: requests.Response):
@@ -22,24 +22,55 @@ def get_origin_url(response: requests.Response):
         ## 연결 상태 확인
         socket.gethostbyname(host)
         return response.url
-    except (socket.gaierror, requests.exceptions.RequestException, Exception):
+    except Exception:
+        return None
+
+## URL의 SSL 공인 인증서 PEM으로 받아오는 함수
+def get_cert_pem_from_url(url: str):
+    ports = [443, 8443]  # 메인 포트와 보조 포트
+
+    domain_name = parse.urlparse(url).netloc
+    domain_name = domain_name.split(":")[0]  # 포트 번호 제거
+
+    for port in ports:
+        try:
+            context = ssl.create_default_context()
+            conn = context.wrap_socket(socket.socket(socket.AF_INET), server_hostname=domain_name)
+            conn.connect((domain_name, port))
+            cert_bin = conn.getpeercert(True)
+            cert_pem = ssl.DER_cert_to_PEM_cert(cert_bin)
+            return cert_pem
+        except Exception:
+            pass
+        finally:
+            if 'conn' in locals():
+                conn.close()
         return None
 
 ## 1.1. ip주소 여부를 통한 판단 기준
 ## 정상 : 1 / 피싱 : -1
-
-def ip_dec(url: str):
+def ip_dec(url: str) -> int:
     netloc = parse.urlparse(url).netloc
-    ip_pattern = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
+    path = parse.urlparse(url).path
 
-    if ip_pattern.match(netloc):
-        return -1
-    else:
-        return 1
+    ## IPv4와 IPv6 패턴을 모두 포함하는 정규식
+    ip_pattern = re.compile(r'(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(?:(?:[0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(?:ffff(?::0{1,4}){0,1}:){0,1}(?:(25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|(?:(?:[0-9a-fA-F]{1,4}:){1,4}:|::(?:ffff(?::0{1,4}){0,1}:){0,1})((25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9]))')
+
+    ## netloc 및 path에서 IP 주소 찾기
+    for match in ip_pattern.findall(netloc + path):
+        if isinstance(match, tuple):
+            match = match[0]
+        try:
+            ipaddress.ip_address(match)
+            return -1
+        except ValueError:
+            pass
+
+    return 1
 
 ## 1.2. 길이를 통한 판단
 ## 정상 : 1 / 의심 : 0 / 피싱 : -1
-def len_dec(url: str):
+def len_dec(url: str) -> int:
     if len(url) < 54:
         return 1
     elif len(url) < 75:
@@ -49,7 +80,7 @@ def len_dec(url: str):
 
 ## 1.3. http redirection 여부를 통한 판단 기준
 ## 정상 : 1 / 피싱 : -1
-def tiny_dec(response: requests.Response):
+def tiny_dec(response: requests.Response) -> int:
     ## redirection 탐지
     for res in response.history:
         if res.status_code == 301 and res.status_code == 302:
@@ -59,7 +90,7 @@ def tiny_dec(response: requests.Response):
 
 ## 1.4. @ 존재 여부를 통한 판단 기준
 ## 정상 : 1 / 피싱 : -1
-def at_sym_dec(url: str):
+def at_sym_dec(url: str) -> int:
     if "@" in url:
         return -1
     else:
@@ -67,7 +98,7 @@ def at_sym_dec(url: str):
 
 ## 1.5. //의 존재 여부를 통한 판단 기준
 ## 정상 : 1 / 피싱 : -1
-def red_dec(url: str):
+def red_dec(url: str) -> int:
     if "//" in (url[7:] if url[:7] == "http://" else url[8:]):
         return -1
     else:
@@ -75,7 +106,7 @@ def red_dec(url: str):
 
 ## 1.6. -의 존재 여부를 통한 판단 기준
 ## 정상 : 1 / 피싱 : -1
-def dash_dec(url: str):
+def dash_dec(url: str) -> int:
     if '-' in url:
         return -1
     else:
@@ -83,7 +114,7 @@ def dash_dec(url: str):
 
 ## 1.7. 하위, 다중 하위 도메인 여부를 통한 판단 기준
 ## 정상 : 1 / 의심 : 0 / 피싱 : -1
-def subdo_dec(url: str):
+def subdo_dec(url: str) -> int:
     netloc_arr = parse.urlparse(url).netloc.split('.')
     ## domain 부분에 ip 형식이 들어있을 경우
     ##get_tld가 TLD name과 일치하는 형식이 존재하지 않아 생기는 오류 방지
@@ -101,22 +132,21 @@ def subdo_dec(url: str):
             else:
                 return -1
 
-'''
-## 1.8.1. SSL final state를 통한 판단 기준
-##        URL의 hostname을 통해 인증서 작성 기관을 보고 신뢰성 판별
+## 1.8. SSL final state를 통한 판단 기준
+##      인증서 발급 기관
+##      인증서 유효 기간
+##   1. 인증서 작성 기관을 통한 판단 기준
 ## 정상 : 1 / 의심 : 0 / 피싱 : -1
-def ssl_fs_dec(url: str):
+def ssl_cn_dec(cert_pem: str) -> int:
     try:
         ## URL로 부터 SSL 받아오기
         x509_cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
-        cert = x509_cert.get_issuer().CN
-        
+        issuer_common_name = x509_cert.get_issuer().CN
+
         ## installed_cas.txt에서 신뢰 가능한 인증서 발급처 목록 읽어오기
-        ## 매 순간 인증서 발급처 목록 갱신하는 get_installed_cas() 실행 예정
+
         with open("installed_cas.txt", "r") as file:
             installed_cas = {line.strip() for line in file.readlines()}
-        
-        issuer_common_name = get_cert_issuer_common_name(cert)
 
         ## 신뢰 가능한 인증서 사용
         if issuer_common_name in installed_cas:
@@ -124,15 +154,38 @@ def ssl_fs_dec(url: str):
         ## 의심스러운 인증서 사용
         else:
             return 0
-
     ## 믿을 수 없거나 그 외의 에러를 발생시키는 경우
-    except ssl.CertificateError as e:
+    except Exception:
         return -1
-    except Exception as e:
+
+##   2. 인증서 유효 기간을 통한 판단 기준
+## 정상 1 / 의심 : 0 / 피싱 : -1
+def ssl_duration_dec(cert_pem: str) -> int:
+    try:
+        x509_cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+    
+        not_before = x509_cert.get_notBefore().decode('utf-8')
+        not_after = x509_cert.get_notAfter().decode('utf-8')
+    
+        ## 인증서 유효 시작일과 종료일 확인
+        start_date = datetime.datetime.strptime(not_before, "%Y%m%d%H%M%SZ")
+        end_date = datetime.datetime.strptime(not_after, "%Y%m%d%H%M%SZ")
+    
+        ## 연 단위로 인증서 유효 기간 계산
+        duration_years = (end_date - start_date).days / 365.25  # Considering leap years
+
+        ## 
+        if duration_years < 0.5:
+            return -1
+        elif duration_years < 1:
+            return 0
+        else:
+            return 1
+    except Exception:
         return -1
-'''
+
 ## 1.9. 도메인 유효 기간을 통한 판단 기준
-def domain_duration_dec(w: whois.WhoisEntry):
+def domain_duration_dec(w) -> int:
     try:
         ## 도메인 유효 기간 계산에 필요한 값
         expiration_date = w.expiration_date
@@ -149,7 +202,7 @@ def domain_duration_dec(w: whois.WhoisEntry):
             return -1
         else:
             return 1
-    except:
+    except Exception:
         # 예외 발생 시 (예: 도메인 정보를 찾을 수 없는 경우) 의심 사이트로 판별
         return 0
 
@@ -191,29 +244,32 @@ def favicon_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optiona
         else:
             return 0
 
-    except Exception as e:
+    except Exception:
         return 0  # 에러 발생 시 0 반환
 
 ## 1.11. 비표준 포트 사용 여부를 통한 판단 기준
 ##       HTTPS 표준 포트 연결 가능 여부 판단
 ##       HTTPS 표준 포트 연결 불가일 경우 예비 포트로 진입
 ## 정상 : 1 / 의심 : 0 / 피싱 : -1
-def port_dec(url: str):
+def port_dec(url: str) -> int:
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)  # 타임아웃 설정
-        sock.connect((url, 443))
-        sock.close()
+        sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock1.settimeout(1)  # 타임아웃 설정
+        sock1.connect((url, 443))
         return 1
-    except (socket.timeout, ConnectionRefusedError, socket.gaierror, Exception):
+    except Exception:
         try:
-              sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-              sock.settimeout(1)  # 타임아웃 설정
-              sock.connect((url, 8443))
-              sock.close()
+              sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+              sock2.settimeout(1)  # 타임아웃 설정
+              sock2.connect((url, 8443))
+              sock2.close()
               return 0
-        except (socket.timeout, ConnectionRefusedError, socket.gaierror, Exception):
+        except Exception:
               return -1
+        finally:
+            sock2.close()
+    finally:
+        sock1.close()
 
 ## 2.1. 사이트 내 외부 URL 비율을 통한 판단 기준
 def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None) -> int:
@@ -254,13 +310,12 @@ def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optio
             return 0
         else:
             return -1
-
-    except Exception as e:
+    except Exception:
         return 0
 
 
 ## 2.6.1. 웹사이트에서 mailto 허용 여부를 통한 판단 기준
-def mailto_dec(response: requests.Response):
+def mailto_dec(response: requests.Response) -> int:
     try:
         ## mailto: 링크가 포함되어 있는지 확인
         if 'mailto:' in response.text:
@@ -272,7 +327,7 @@ def mailto_dec(response: requests.Response):
         return -1
 
 ## 2.6.2. 웹사이트에서 mail 사용 여부를 통한 판단 기준
-def mail_dec(response: requests.Response):
+def mail_dec(response: requests.Response) -> int:
     try:
         if "mail(" in response.text:
             return -1  # mail() 사용
@@ -285,7 +340,7 @@ def mail_dec(response: requests.Response):
 ## 3.1. 웹사이트 포워딩을 통한 판단 기준
 ##      redirection 횟수를 기준으로 1번 이하이면 안전, 4번 이상이면 피싱
 ##      2번 이상 4번 미만일 경우 의심 사이트
-def redir_dec(response: requests.Response):
+def redir_dec(response: requests.Response) -> int:
     try:
         if len(response.history) < 2:
             return 1
@@ -297,7 +352,7 @@ def redir_dec(response: requests.Response):
         return 0
 
 ## 3.3. 오른쪽 클릭 비활성화를 통한 판단 기준
-def right_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None):
+def right_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None) -> int:
     try:
         ## BeautifulSoup 사용
         if soup:
@@ -331,7 +386,7 @@ def right_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[
         else:
             return 0
 
-    except Exception as e:
+    except Exception:
         return 0
 
     ## soup와 options 둘 다 None이라면 의심
@@ -340,7 +395,7 @@ def right_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[
 
 ## 4.1. 도메인 수명을 통한 판단 기준
 ##      피싱사이트 수명이 짧은 것을 이용
-def age_dec(w: whois.WhoisEntry):
+def age_dec(w) -> int:
     ## whois 사용 가능
     try:
         if w:
@@ -367,52 +422,75 @@ def age_dec(w: whois.WhoisEntry):
         ## whois 사용 불가
         else:
             return 0
-    except:
+    except Exception:
         return 0
+    
 class URLFeature:
     def __init__(self, url: str):
         self.url = url
         try:
-            self.response = requests.get(url)
+            self.response = requests.get(self.url)
         except:
-            self.response = None
-            
-        if self.response:
-            self.origin = get_origin_url(self.response)
-            try:
-                self.w = whois.whois(self.origin, timeout = 15)
-            except:
-                self.w = None
-                
-            try:
-                self.soup = BeautifulSoup(self.response.content, "html.parser")
-            except:
-                self.soup = None
-                
-            try:
-                self.options = webdriver.ChromeOptions()
-            except:
-                self.options = None
-            
-            self.__data = [ip_dec(self.url),
-                           len_dec(self.url),
-                           tiny_dec(self.response),
-                           at_sym_dec(self.url),
-                           red_dec(self.url),
-                           dash_dec(self.url),
-                           subdo_dec(self.url),
-                           domain_duration_dec(self.w),
-                           favicon_dec(self.origin, self.soup, self.options),
-                           port_dec(self.origin),
-                           url_ratio_dec(self.origin, self.soup, self.options),
-                           mailto_dec(self.response),
-                           mail_dec(self.response),
-                           redir_dec(self.response),
-                           right_dec(self.origin, self.soup, self.options),
-                           age_dec(self.w)]
-        else:
             self.__data = None
+            return
+        
+        self.origin = get_origin_url(self.response)
+        try:
+            self.w = whois.whois(self.origin)
+        except:
+            self.w = None
 
+        is_file = os.path.isfile(self.url)
+        
+        if is_file:
+            try:
+                with open(url, 'rb') as f:
+                    self.content = f.read()
+            except:
+                self.content = None
+        else:
+            try:
+                self.content = self.response.content
+            except:
+                self.content = None
+
+        ## 해당 콘텐츠로부터 BeautifulSoup 객체 생성
+        try:
+            if self.content:
+                self.soup = BeautifulSoup(self.content, "html.parser")
+            else:
+                self.soup = None
+        except:
+            self.soup = None
+                
+        try:
+            self.options = webdriver.ChromeOptions()
+        except:
+            self.options = None
+
+        try:
+            self.cert_pem = get_cert_pem_from_url(self.url)
+        except:
+            self.cert_pem = None
+            
+        self.__data = [ip_dec(self.url),
+                       len_dec(self.url),
+                       tiny_dec(self.response),
+                       at_sym_dec(self.url),
+                       red_dec(self.url),
+                       dash_dec(self.url),
+                       subdo_dec(self.url),
+                       ssl_cn_dec(self.cert_pem),
+                       ssl_duration_dec(self.cert_pem),
+                       domain_duration_dec(self.w),
+                       favicon_dec(self.origin, self.soup, self.options),
+                       port_dec(self.origin),
+                       url_ratio_dec(self.origin, self.soup, self.options),
+                       mailto_dec(self.response),
+                       mail_dec(self.response),
+                       redir_dec(self.response),
+                       right_dec(self.origin, self.soup, self.options),
+                       age_dec(self.w)]
     @property
     def data(self):
         return self.__data
@@ -435,28 +513,33 @@ class URLFeature:
 
 features_list = []
 labels_list = []
-path = "C:\\Users\\Admin\\Desktop\\phishing_AI\\npy\\"
-n = 1
+path = "C:\\Users\\Admin\\Desktop\\training\\"
+n = 0
 
-with open("verified_online.csv", 'r') as csvfile:
+with open(f"{path}training_data_120k_140k_final.csv", 'r') as csvfile:
     reader = csv.reader(csvfile)
     next(reader)
     for row in reader:
         feature = URLFeature(row[1])
-        label = 1
+        label = row[2]
+        print(f"{row[0]}번째 : {row[2]}")
         if feature and feature.data:
+            print(f"{feature.data}\n")
             features_list.append(feature.data)
             labels_list.append(label)
             n += 1
-        if n % 10 == 0:
+        if n % 100 == 0:
             ## 리스트를 numpy 배열로 변환
             features_array = np.array(features_list)
             labels_array = np.array(labels_list)
     
             # npy 파일로 저장
-            np.save(f"{path}black_data_{n // 10}.npy", features_array)
-            np.save(f"{path}black_label_{n // 10}.npy", labels_array)
-
+            np.save(f"{path}npy\\training_feature_{n // 100}.npy", features_array)
+            np.save(f"{path}npy\\training_label_{n // 100}.npy", labels_array)
+            
+        if row[0] == 20000:
+            np.save(f"{path}npy\\training_feature_final.npy", features_array)
+            np.save(f"{path}npy\\training_label_final.npy", labels_array)
 
 
     
