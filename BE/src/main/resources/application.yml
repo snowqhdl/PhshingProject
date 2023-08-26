@@ -1,4 +1,6 @@
-S3domain : http://phish-netter.s3-website.kr.object.ncloudstorage.com
+domain :  ec2-18-212-108-195.compute-1.amazonaws.com:8080
+S3domain: http://phishnetter.s3-website.ap-northeast-2.amazonaws.com:80
+
 
 spring:
   datasource:
