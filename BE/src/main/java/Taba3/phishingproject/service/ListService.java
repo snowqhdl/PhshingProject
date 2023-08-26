@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Objects;
+
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -35,9 +37,11 @@ public class ListService {
         } else {
             // AI 서버로 API 호출
        ResponseEntity<String> response = restTemplate.exchange(AI_SERVER, HttpMethod.POST, requestEntity, String.class);
-       return response.getBody();
+       if (Objects.equals(response.getBody(), "none")){
+           return "none";
+       } else
+           return response.getBody();
         }
-
     }
 
 

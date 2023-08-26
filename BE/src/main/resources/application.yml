@@ -1,30 +1,34 @@
-server:
-  servlet:
-    encoding:
-      charset: UTF-8
+S3domain : http://phish-netter.s3-website.kr.object.ncloudstorage.com
+
 spring:
-  profiles:
-    include: common
-    active: local
-  h2:
-    console:
-      enabled: true
-      path: /h2
   datasource:
-    url: jdbc:h2:mem:testdb;NON_KEYWORDS=USER
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://db-i9ss7.pub-cdb.ntruss.com:13306/PhishNetter?Seoul&characterEncoding=UTF-8
+    username: owen
+    password: ow980916@
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database: mysql
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+    generate-ddl: true
     hibernate:
-      ddl-auto: create
+      ddl-auto: none
+    show-sql: true
     properties:
       hibernate:
-        format_sql: true
         highlight_sql: true
-        use_sql_comments: true
-logging:
-  level:
-    org.hibernate.SQL: trace
-    org.hibernate.type.descriptor.sql.BasicBinder: trace
+        format_sql: true
+  output:
+    ansi:
+      enabled: always
+  logging:
+    level:
+      org:
+        hibernate:
+          SQL: DEBUG
+          type:
+            descriptor:
+              sql:
+                BasicBinder: TRACE
+        springframework:
+          orm:
+            jpa: DEBUG
