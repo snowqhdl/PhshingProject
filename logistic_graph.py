@@ -27,6 +27,13 @@ X, y = load_data_from_path()
 print("Shape of X:", X.shape)
 print("\nShape of y:", y.shape)
 
+# k겹 교차검증
+k = 5   # 예: 5겹 교차검증
+logistic_model = LogisticRegression(solver='saga', max_iter=10000)
+cv_scores = cross_val_score(logistic_model, X, y, cv=k, scoring='accuracy')
+
+print(f"\n{k}-fold Cross Validation Scores:", cv_scores)
+print(f"Average {k}-fold CV Score: {np.mean(cv_scores):.4f}")
 
 #특성 추출로 변환된 데이터를 학습 데이터와 테스트 데이터로 분할
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -44,7 +51,7 @@ start_time = time.time()
 # 로지스틱 회귀 모델 생성 및 학습
 # solver로 'saga'를 사용하고 max_iter를 증가시켜 수렴까지의 반복 횟수를 늘립니다.
 # verbose=True로 설정하면 학습 과정에서 손실의 변화를 출력할 수 있습니다.
-logistic_model = LogisticRegression(solver='saga', max_iter=10000)   #verbose=True)
+#logistic_model = LogisticRegression(solver='saga', max_iter=10000)   #verbose=True)
 logistic_model.fit(X_train, y_train)
 
 #clf = LogisticRegression().fit(X, y)
