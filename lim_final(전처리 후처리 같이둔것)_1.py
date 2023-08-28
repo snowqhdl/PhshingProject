@@ -6,13 +6,10 @@ from selenium import webdriver
 import re
 import ssl
 import whois
-import psutil
 import datetime
-import subprocess
 import socket
 import requests
 import numpy as np
-import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, auc
 from sklearn.linear_model import LogisticRegression
@@ -443,18 +440,18 @@ loaded_model = joblib.load(model_save_path)
 def predict():
     input_url = request.json
 
-# 특성 추출
-X_input = feature_extraction_single_url(input_url)
+    # 특성 추출
+    X_input = feature_extraction_single_url(input_url)
 
-try:
-    # 예측 확률 출력
-    probabilities = loaded_model.predict_proba(X_input)
-    phishing_probs = [round(prob[1],2) for prob in probabilities]
-    #phishing_prob = probabilities[0][1]  # 두 번째 값은 피싱 사이트일 확률입니다.
-    jsonify({"result": phishing_probs})
+    try:
+        # 예측 확률 출력
+        probabilities = loaded_model.predict_proba(X_input)
+        phishing_probs = [round(prob[1],2) for prob in probabilities]
+        #phishing_prob = probabilities[0][1]  # 두 번째 값은 피싱 사이트일 확률입니다.
+        jsonify({"result": phishing_probs})
 
-except:
-    jsonify(None)
+    except:
+        jsonify(None)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
