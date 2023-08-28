@@ -15,6 +15,6 @@ public class WhiteList {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long whiteUrlId;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 4096)
     private String url;
 }
