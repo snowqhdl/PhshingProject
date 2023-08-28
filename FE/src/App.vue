@@ -61,7 +61,7 @@ const submit = async () => {
     showWarning.value = false; 
   }
   
-  const { data } = await axios.get(`http://ec2-43-200-169-122.ap-northeast-2.compute.amazonaws.com/validation/check?url=${urlInput.value}`)
+  const { data } = await axios.get(`http://localhost:8080/validation/check?url=${urlInput.value}`)
 
   result.value = true
 
