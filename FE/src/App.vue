@@ -17,7 +17,7 @@
   <div v-if="result" class="result" @click="close">
     <ResultModal :res="res" :percent="percent" />
   </div>
-  <p class="trust-message">저희의 데이터베이스와 AI는 꾸준히 업데이트되어 최신의 위협을 탐지합니다.</p>
+  <p class="trust-message">저희의 데이터베이스와 AI는 꾸준히 업데이트 되어 최신의 위협을 탐지합니다.</p>
 </template>
 
 <script setup>
@@ -61,7 +61,7 @@ const submit = async () => {
     showWarning.value = false; 
   }
   
-  const { data } = await axios.get(`http://ec2-43-200-169-122.ap-northeast-2.compute.amazonaws.com:8080/validation/check?url=${urlInput.value}`)
+  const { data } = await axios.get(`http://ec2-43-200-169-122.ap-northeast-2.compute.amazonaws.com/validation/check?url=${urlInput.value}`)
 
   result.value = true
 
