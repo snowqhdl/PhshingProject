@@ -139,7 +139,7 @@ def subdo_dec(url: str) -> int:
     
         try:
             subdomain = get_tld(sanitized_url, as_object=True).subdomain
-        except (TldBadUrl, TldDomainNotFound, TldImproperlyConfigured):
+        except Exception:
             return -1
 
         ## 서브도메인 판단
@@ -449,7 +449,7 @@ class URLFeature:
     def __init__(self, url: str):
         self.url = url
         try:
-            self.response = requests.get(self.url)
+            self.response = requests.get(self.url, timeout = 15)
         except:
             self.__data = None
             return
