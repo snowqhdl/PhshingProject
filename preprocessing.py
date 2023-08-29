@@ -66,7 +66,6 @@ def ip_dec(url: str) -> int:
             return -1
         except ValueError:
             pass
-
     return 1
 
 ## 1.2. 길이를 통한 판단
@@ -194,7 +193,7 @@ def ssl_duration_dec(cert_pem: str) -> int:
         ## 연 단위로 인증서 유효 기간 계산
         duration_years = (end_date - start_date).days / 365.25  # Considering leap years
 
-        ## 
+        ## 6개월 미만은 피싱, 6년 이상, 1년 미만은 의심, 그 외는 정상 사이트
         if duration_years < 0.5:
             return -1
         elif duration_years < 1:
@@ -205,6 +204,7 @@ def ssl_duration_dec(cert_pem: str) -> int:
         return -1
 
 ## 1.9. 도메인 유효 기간을 통한 판단 기준
+## 정상 : 1 / 의심 : 0 / 피싱 : -1
 def domain_duration_dec(w) -> int:
     try:
         ## 도메인 유효 기간 계산에 필요한 값
@@ -223,13 +223,13 @@ def domain_duration_dec(w) -> int:
         else:
             return 1
     except Exception:
-        # 예외 발생 시 (예: 도메인 정보를 찾을 수 없는 경우) 의심 사이트로 판별
+        ## 예외 발생 시 의심 사이트로 판별
         return 0
 
 ## 1.10. favicon을 통한 판단 기준
+## 정상 : 1 / 의심 : 0 / 피싱 : -1
 def favicon_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[webdriver.ChromeOptions] = None) -> int:
     favicon_url = None
-
     try:
         ## BeautifulSoup 사용가능시
         if soup:
@@ -263,9 +263,9 @@ def favicon_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optiona
         ## favicon이 존재하면서 그 도메인이 존재하지 않는 경우 판단 불가
         else:
             return 0
-
+    ## 예외 발생 시 의심 사이트로 판별
     except Exception:
-        return 0  # 에러 발생 시 0 반환
+        return 0  
 
 ## 1.11. 비표준 포트 사용 여부를 통한 판단 기준
 ##       HTTPS 표준 포트 연결 가능 여부 판단
@@ -339,12 +339,14 @@ def mailto_dec(response: requests.Response) -> int:
     try:
         ## mailto: 링크가 포함되어 있는지 확인
         if 'mailto:' in response.text:
-            return 0
+            return -1
         else:
             return 1
     ## 요청에서 오류 발생
     except AttributeError as e:
-        return -1
+        return 0
+    except Exception:
+        return 0
 
 ## 2.6.2. 웹사이트에서 mail 사용 여부를 통한 판단 기준
 def mail_dec(response: requests.Response) -> int:
@@ -353,8 +355,9 @@ def mail_dec(response: requests.Response) -> int:
             return -1  # mail() 사용
         else:
             return 1  # mail() 사용하지 않음
-
     except AttributeError as e:
+        return 0
+    except Exception:
         return 0
 
 ## 3.1. 웹사이트 포워딩을 통한 판단 기준
@@ -455,13 +458,15 @@ class URLFeature:
             return
         
         self.origin = get_origin_url(self.response)
+
+        ## whois 객체 생성
         try:
             self.w = whois.whois(self.origin)
         except:
             self.w = None
 
+        ## BeautifulSoup 객체 생성 시도 전 파일 여부 확인
         is_file = os.path.isfile(self.url)
-        
         if is_file:
             try:
                 with open(url, 'rb') as f:
@@ -474,7 +479,7 @@ class URLFeature:
             except:
                 self.content = None
 
-        ## 해당 콘텐츠로부터 BeautifulSoup 객체 생성
+        ## BeautifulSoup 객체 생성 시도
         try:
             if self.content:
                 self.soup = BeautifulSoup(self.content, "html.parser")
@@ -482,7 +487,7 @@ class URLFeature:
                 self.soup = None
         except:
             self.soup = None
-                
+        ## webdriver 객체 생성 시도
         try:
             self.options = webdriver.ChromeOptions()
         except:
@@ -535,8 +540,10 @@ features_list = []
 labels_list = []
 path = "C:\\Users\\Admin\\Desktop\\최종\\1\\"
 n = 0
+f_info = "0_20k"
+end_id = 20000
 
-with open(f"{path}training_data_0_20k_final.csv", 'r') as csvfile:
+with open(f"{path}training_data_{f_info}_final.csv", 'r') as csvfile:
     reader = csv.reader(csvfile)
     next(reader)
     for row in reader:
@@ -557,9 +564,9 @@ with open(f"{path}training_data_0_20k_final.csv", 'r') as csvfile:
             np.save(f"{path}npy\\training_feature_{n // 100}.npy", features_array)
             np.save(f"{path}npy\\training_label_{n // 100}.npy", labels_array)
             
-        if row[0] == 20000:
-            np.save(f"{path}npy\\training_feature_final.npy", features_array)
-            np.save(f"{path}npy\\training_label_final.npy", labels_array)
+        if row[0] == end_id:
+            np.save(f"{path}npy\\training_feature_{f_info}_final.npy", features_array)
+            np.save(f"{path}npy\\training_label_{f_info}_final.npy", labels_array)
 
 
     
