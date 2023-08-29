@@ -18,6 +18,7 @@ import joblib
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+chromdriver = "/usr/local/bin/chromedriver
 
 ## URL의 최종 URL 반환하는 함수
 def get_origin_url(response: requests.Response):
@@ -229,7 +230,7 @@ def url_ratio_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optio
         ## bs4 사용이 불가능해서 selenium을 통해 소스코드를 받아와서 파싱
         elif options:
             options.add_argument('--log-level=3')
-            driver = webdriver.Chrome(executable_path="chromedriver.exe", chrome_options=options)
+            driver = webdriver.Chrome(executable_path=chromdriver, chrome_options=options)
             driver.get(url)
             page_source = driver.page_source
             driver.quit()
@@ -318,7 +319,7 @@ def right_dec(url: str, soup: Optional[BeautifulSoup] = None, options: Optional[
             return 1
         elif options:
             # Check with Selenium
-            with webdriver.Chrome(executable_path="chromedriver.exe", options=options) as driver:
+            with webdriver.Chrome(executable_path = chromdriver, options=options) as driver:
                 driver.get(url)
                 if driver.find_elements_by_xpath("//body[@oncontextmenu='return false']") or driver.find_elements_by_xpath("//html[@oncontextmenu='return false']"):
                     return -1
@@ -361,6 +362,8 @@ def age_dec(w: Optional[whois.WhoisEntry] = None):
             return 0
     except:
         return 0
+
+##############################################################################################################################################################
 
 class URLFeature:
     def __init__(self, url: str):
@@ -423,8 +426,9 @@ class URLFeature:
     def __repr__(self):
         return repr(self.__data)
 
+##############################################################################################################################################################
 
-# 데이터 전처리
+## 데이터 전처리
 def feature_extraction_single_url(url):
     features = URLFeature(url).data  # URLFeature class를 사용하여 특성을 추출합니다.
     return np.array([features])
@@ -432,26 +436,26 @@ def feature_extraction_single_url(url):
 app = Flask(__name__)
 CORS(app)
 
-# 저장된 모델 불러오기
-model_save_path = 'C:\\Users\\user\\Desktop\\프로젝트\\ai\\ai_logistic_100k.pkl'    # 이 부분에서 본인 파일 경로 지정하세요.
-loaded_model = joblib.load(model_save_path)
+## 저장된 모델 불러오기
+model_save_path = '/ai_logistic_100k.pkl'
 
 @app.route('/predict', methods=['POST'])
 def predict():
     input_url = request.json
+    loaded_model = joblib.load(model_save_path)
 
     # 특성 추출
     X_input = feature_extraction_single_url(input_url)
 
     try:
-        # 예측 확률 출력
+        ## 예측 확률 출력
         probabilities = loaded_model.predict_proba(X_input)
         phishing_probs = [round(prob[1],2) for prob in probabilities]
-        #phishing_prob = probabilities[0][1]  # 두 번째 값은 피싱 사이트일 확률입니다.
+        ## phishing_prob = probabilities[0][1]  # 두 번째 값은 피싱 사이트일 확률입니다.
         jsonify({"result": phishing_probs})
 
     except:
         jsonify(None)
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5001)
+    app.run(host='0.0.0.0', port=5001)
