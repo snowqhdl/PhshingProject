@@ -22,7 +22,7 @@ public class ListService {
     private final PredictedListRepository predictedRepo;
 
     public String predictDangerPercentage(String url) {
-        String AI_SERVER = "http://127.0.0.1:5001/predict";
+        String AI_SERVER = "http://ec2-43-201-6-77.ap-northeast-2.compute.amazonaws.com:5001/predict:5001/predict";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         String requestBody = "{\"url\": \"" + url + "\"}";

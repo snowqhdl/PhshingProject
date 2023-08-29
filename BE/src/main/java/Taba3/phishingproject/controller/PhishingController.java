@@ -13,7 +13,6 @@ public class PhishingController {
     private final ListService service;
 
  @CrossOrigin(origins = "http://phishnetter.s3-website.ap-northeast-2.amazonaws.com")
-//    @CrossOrigin(origins = "http://localhost:5173/")
     @GetMapping("/check")
     public ResponseEntity validation(@RequestParam(value = "url") String url) {
         String result = service.predictDangerPercentage(url);
