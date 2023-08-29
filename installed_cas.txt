@@ -138,3 +138,11 @@ issuer=C = GR, L = Athens, O = Hellenic Academic and Research Institutions Cert.
 issuer=C = DE, O = D-Trust GmbH, CN = D-TRUST BR Root CA 1 2020
 issuer=C = US, O = DigiCert Inc, OU = www.digicert.com, CN = DigiCert High Assurance EV Root CA
 issuer=C = US, ST = Arizona, L = Scottsdale, O = "Starfield Technologies, Inc.", CN = Starfield Services Root Certificate Authority - G2
+issuer=C = US, O = DigiCert Inc, CN = DigiCert TLS RSA SHA256 2020 CA1
+issuer=C = US, O = Google Trust Services LLC, CN = GTS CA 1C3
+issuer=C = US, O = DigiCert Inc, CN = DigiCert Global CA G2
+issuer=C = US, O = Microsoft Corporation, CN = Microsoft Azure TLS Issuing CA 06
+issuer=C = US, O = DigiCert Inc, CN = DigiCert EV RSA CA G2
+issuer=C = BE, O = GlobalSign nv-sa, CN = GlobalSign Extended Validation CA - SHA256 - G3
+issuer=C = US, O = Let's Encrypt, CN = R3
+issuer=C = GB, ST = Greater Manchester, L=Salford, O=Sectigo Limited, CN = Sectigo RSA Extended Validation Secure Server CA
