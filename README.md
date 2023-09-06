@@ -2,6 +2,7 @@
 Taba 3rd Phshing Project
 
 ai_MLP_100k_character18_len.h5
+
 Classification Report:
               precision    recall  f1-score   support
 
@@ -11,3 +12,5 @@ Classification Report:
     accuracy                           0.64      3620
    macro avg       0.32      0.50      0.39      3620
 weighted avg       0.41      0.64      0.50      3620
+
+
